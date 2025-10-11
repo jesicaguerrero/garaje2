@@ -1,4 +1,4 @@
-package com.uts.taller1.vehicleapp2;
+package com.garaje.vehicleapp2;
 
 import jakarta.ws.rs.ApplicationPath;
 import jakarta.ws.rs.core.Application;
