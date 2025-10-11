@@ -23,38 +23,23 @@ public class VehiculoDAO {
     /**
      * Inicializa con una conexión JDBC ya creada.
      *
-     * @param con conexión activa a MySQL
+     * @param con conexión activa a la BD
      */
     public VehiculoDAO(Connection con) {
         this.con = con;
     }
 
     /**
-     * Busca todos los vehículos en la base de datos.
-     *
-     * @return Lista de Vehiculo o lista vacía.
-     * @throws SQLException si hay error de conexión BID.
+     * Lista todos los vehículos.
      */
     public List<Vehiculo> listar() throws SQLException {
         List<Vehiculo> lista = new ArrayList<>();
         String sql = "SELECT * FROM vehiculos";
-        try (Statement st = con.createStatement(); ResultSet rs = st.executeQuery(sql)) {
+        try (Statement st = con.createStatement();
+             ResultSet rs = st.executeQuery(sql)) {
             while (rs.next()) {
-                Vehiculo v = new Vehiculo(
-                        rs.getInt("id"),
-                        rs.getString("placa"),
-                        rs.getString("marca"),
-                        rs.getString("modelo"),
-                        rs.getString("color"),
-                        rs.getString("propietario")
-                );
-                lista.add(v);
+                lista.add(mapVehiculo(rs));
             }
-        } catch (SQLException ex) {
-// Manejo de error: loggear el error y relanzar
-            System.err.println("Error al listar vehículos: "
-                    + ex.getMessage());
-            throw ex; // relanzar para manejar en capa superior
         }
         return lista;
     }
@@ -66,103 +51,104 @@ public class VehiculoDAO {
         String sql = "SELECT * FROM vehiculos WHERE id=?";
         try (PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, id);
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) {
-                return new Vehiculo(
-                        rs.getInt("id"),
-                        rs.getString("placa"),
-                        rs.getString("marca"),
-                        rs.getString("modelo"),
-                        rs.getString("color"),
-                        rs.getString("propietario")
-                );
-
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return mapVehiculo(rs);
+                }
             }
-        } catch (SQLException ex) {
-            System.err.println("Error al buscar vehículo por id: "
-                    + ex.getMessage());
-            throw ex;
         }
         return null;
     }
 
     /**
-     * Verifica si ya existe una placa registrada. Útil para reglas de negocio.
-     *
-     * @param placa placa a buscar
-     * @return true si existe, false si no
+     * Busca un vehículo por placa.
+     * Útil para validar duplicados.
+     */
+    public Vehiculo buscarPorPlaca(String placa) throws SQLException {
+        String sql = "SELECT * FROM vehiculos WHERE placa=?";
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
+            ps.setString(1, placa);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return mapVehiculo(rs);
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Verifica si existe una placa en la BD (versión booleana).
      */
     public boolean existePlaca(String placa) throws SQLException {
         String sql = "SELECT COUNT(*) FROM vehiculos WHERE placa=?";
         try (PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setString(1, placa);
-            ResultSet rs = ps.executeQuery();
-            if (rs.next()) {
-                return rs.getInt(1) > 0;
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
             }
-        } catch (SQLException ex) {
-            System.err.println("Error al verificar placa: "
-                    + ex.getMessage());
-            throw ex;
         }
         return false;
     }
 
     /**
-     * Agrega un nuevo vehículo si la placa no existe. Lanzar SQLException si
-     * falla.
+     * Agrega un nuevo vehículo.
      */
     public void agregar(Vehiculo v) throws SQLException {
-        String sql = "INSERT INTO vehiculos (placa, marca, modelo, color, propietario) "
-           + "VALUES (?, ?, ?, ?, ?)";
-
-try (PreparedStatement ps = con.prepareStatement(sql)) {
+        String sql = "INSERT INTO vehiculos (placa, marca, modelo, color, propietario, anio) VALUES (?, ?, ?, ?, ?, ?)";
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setString(1, v.getPlaca());
             ps.setString(2, v.getMarca());
             ps.setString(3, v.getModelo());
             ps.setString(4, v.getColor());
             ps.setString(5, v.getPropietario());
+            ps.setInt(6, v.getAnio());
             ps.executeUpdate();
-        } catch (SQLException ex) {
-            System.err.println("Error al agregar vehículo: "
-                    + ex.getMessage());
-            throw ex;
         }
     }
 
     /**
-     * Actualiza todos los datos de un vehículo existente por id.
+     * Actualiza un vehículo existente por ID.
      */
     public void actualizar(Vehiculo v) throws SQLException {
-        String sql = "UPDATE vehiculos SET placa=?, marca=?, modelo=?, color=?, propietario=? "
-           + "WHERE id=?";
-try (PreparedStatement ps = con.prepareStatement(sql)) {
+        String sql = "UPDATE vehiculos SET placa=?, marca=?, modelo=?, color=?, propietario=?, anio=? WHERE id=?";
+        try (PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setString(1, v.getPlaca());
             ps.setString(2, v.getMarca());
             ps.setString(3, v.getModelo());
             ps.setString(4, v.getColor());
             ps.setString(5, v.getPropietario());
-            ps.setInt(6, v.getId());
+            ps.setInt(6, v.getAnio());
+            ps.setInt(7, v.getId());
             ps.executeUpdate();
-        } catch (SQLException ex) {
-            System.err.println("Error al actualizar vehículo: "
-                    + ex.getMessage());
-            throw ex;
         }
     }
 
     /**
-     * Borra un vehículo por id.
+     * Elimina un vehículo por ID.
      */
     public void eliminar(int id) throws SQLException {
         String sql = "DELETE FROM vehiculos WHERE id=?";
         try (PreparedStatement ps = con.prepareStatement(sql)) {
             ps.setInt(1, id);
             ps.executeUpdate();
-        } catch (SQLException ex) {
-            System.err.println("Error al eliminar vehículo: "
-                    + ex.getMessage());
-            throw ex;
         }
+    }
+
+    /**
+     * Convierte un ResultSet en objeto Vehiculo.
+     */
+    private Vehiculo mapVehiculo(ResultSet rs) throws SQLException {
+        return new Vehiculo(
+                rs.getInt("id"),
+                rs.getString("placa"),
+                rs.getString("marca"),
+                rs.getString("modelo"),
+                rs.getString("color"),
+                rs.getString("propietario"),
+                rs.getInt("anio")
+        );
     }
 }
